@@ -9,7 +9,7 @@ modules="gi pystemd"
 policy_path="/usr/share/polkit-1/actions"
 rules_path="/usr/share/polkit-1/rules"
 policy="com.ducksfeet.sview.policy"
-rules="10-systemctl-polkit.rulesr"
+rules="10-systemctl-polkit.rules"
 desktop="sview.desktop"
 binloc="/usr/bin"
 cat << EOF
