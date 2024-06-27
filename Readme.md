@@ -9,10 +9,11 @@ I wrotet this yesterday, while watching TV. This should be considered ALPHA code
 ## Installation
 To use sview, the follwing python modules are required: 
 
-|Module|Installation Candidate|
-|_________|______________________|
+|Module   |Installation Candidate|
+|---------|----------------------|
 |    gi   | pygobject, cairo     |
 | pystemd | python3-pystemd      |
+
 
 If these modules are not installed, check your distributions installation instructions.
 
