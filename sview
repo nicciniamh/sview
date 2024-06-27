@@ -11,7 +11,7 @@ from gi.repository import Gtk, GdkPixbuf
 
 debug_flag = False
 
-def get_units(include_all=False):
+def get_units(include_all=True):
 	"""
 	returns a dictionary of unit information, keyed on the unit name. 
 	"""
@@ -34,7 +34,7 @@ def get_units(include_all=False):
 
 class ServiceViewer(Gtk.Window):
 	def __init__(self):
-		Gtk.Window.__init__(self, title="Service Viewer")
+		Gtk.Window.__init__(self, title="Systemd Unit Viewer")
 		self.connect('destroy', Gtk.main_quit)
 		self.set_icon(GdkPixbuf.Pixbuf.new_from_file(os.path.expanduser('~/.icons/text-x-systemd-unit.png')))
 		self.grid = None
