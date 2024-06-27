@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Systemd Unit Viewer
+Comment=View current systemd unts and states
+TryExec=/usr/bin/sview
+Exec=/usr/bin/sview
+Icon=org.gnome.SystemMonitor
+Terminal=false
+Type=Application
+StartupNotify=true
+StartupWMClass=sview-viewer
+Categories=GTK;System;

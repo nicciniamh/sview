@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+import os
+import sys
+import textwrap
+import subprocess
+import inspect
+from pystemd.systemd1 import Unit, Manager
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GdkPixbuf
+
+debug_flag = False
+
+def get_units(include_all=False):
+	"""
+	returns a dictionary of unit information, keyed on the unit name. 
+	"""
+	m = Manager()
+	m.load()
+	units = {}
+	for u in m.ListUnits():
+		ud = {}
+		ud['unit'] = '\n'.join(textwrap.wrap(u[0].decode('utf-8'),40))
+		if not include_all and not 'service' in ud['unit']:
+			continue
+		ud['description'] = '\n'.join(textwrap.wrap(u[1].decode('utf-8'), 40))
+		ud['loaded'] = (u[2].decode('utf-8').lower() == 'loaded')
+		ud['active'] = (u[3].decode('utf-8').lower() == 'active')
+		ud['running'] = (u[4].decode('utf-8').lower() == 'running')
+		ud['file'] = u[6]
+		units[ud['unit']] = ud
+
+	return units
+
+class ServiceViewer(Gtk.Window):
+	def __init__(self):
+		Gtk.Window.__init__(self, title="Service Viewer")
+		self.connect('destroy', Gtk.main_quit)
+		self.set_icon(GdkPixbuf.Pixbuf.new_from_file(os.path.expanduser('~/.icons/text-x-systemd-unit.png')))
+		self.grid = None
+		self.set_size_request(1280, 600)
+		self.load_tree_view()
+
+	def get_buttons(self,buttondef):
+		"""
+		return a Gtk.ButtonBox populate with the buttons we want
+		"""
+		buttons = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL)
+		buttons.set_layout(Gtk.ButtonBoxStyle.START)
+
+		for label,action in buttondef:
+			button = Gtk.Button(label=label)
+			button.connect('clicked', action)
+			buttons.pack_start(button, False, False, 0)
+		return buttons
+
+	def load_tree_view(self, *args):
+		self.units = get_units()
+		buttons = self.get_buttons([('Close',Gtk.main_quit),('Reload Units',self.load_tree_view)])
+		if self.grid:
+			self.remove(self.grid)
+		self.grid = Gtk.Grid()
+		self.storelist = []
+		self.scrolled_window = Gtk.ScrolledWindow()
+		self.grid.attach(self.scrolled_window, 0, 0, 1, 1)
+		self.grid.attach(buttons, 0, 1, 1, 1)
+		self.store = Gtk.ListStore(str, str, bool, bool)
+		for unit, ud in self.units.items():
+			items = [unit, ud['description'], ud['active'], ud['running']]
+			self.store.append(items)
+			items.append(ud['file'])
+			self.storelist.append(items)
+		
+		self.tree_view = Gtk.TreeView(model=self.store)
+		
+		# Text columns
+		for i, column_title in enumerate(["Unit", "Description"]):
+			renderer = Gtk.CellRendererText()
+			column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+			column.set_expand(True)
+			self.tree_view.append_column(column)
+			# Make columns sortable
+			column.set_sort_column_id(i)
+		
+		# Toggle columns
+		for i, column_title in enumerate(["Active", "Running"], start=2):
+			renderer = Gtk.CellRendererToggle()
+			renderer.set_alignment(0.5, 0.5)
+			renderer.connect("toggled", self.on_cell_toggled, (i, column_title))
+			column = Gtk.TreeViewColumn(column_title, renderer, active=i)
+			column.set_expand(True)
+			column.set_alignment(0.5)
+			self.tree_view.append_column(column)
+			# Make columns sortable
+			column.set_sort_column_id(i)
+		
+		self.scrolled_window.add(self.tree_view)
+		self.scrolled_window.set_vexpand(True)
+		self.scrolled_window.set_hexpand(True)
+
+		self.add(self.grid)
+		self.show_all()
+
+	def on_cell_toggled(self, widget, path, user_data):
+		i = int(path)
+		index = Gtk.TreePath.new_from_string(path).get_indices()[0]
+		column, column_title = user_data
+		state = self.store[i][column] = not self.store[i][column]
+		unit = self.store[i][0]
+		self.set_service_state(unit, column_title, state)
+
+	def set_service_state(self, unit, item, state):
+		"""
+		this is where we call systemd to manipulate units based on item and state
+		"""
+		debug(unit, item, state)
+
+		if item == 'Running':
+			if state:
+				self.run_privileged_task(unit, 'start')
+			else:
+				self.run_privileged_task(unit, 'stop')
+		elif item == 'Active':
+			if state:
+				self.run_privileged_task(unit, 'enable')
+			else:
+				self.run_privileged_task(unit, 'disable')
+		else:
+			raise IndexError(f'Invalid item {item}')
+
+
+	def run_privileged_task(self,*args):
+		# Command to run the privileged script with pkexec
+		command = ["pkexec", "/usr/share/polkit-1/helpers/com.ducksfeet.sview.helper",*args]
+		
+		# Run the command
+		try:
+			result = subprocess.run(command, capture_output=True, text=True)
+			if result.returncode == 0:
+				print("Privileged task completed successfully",result.stdout)
+			else:
+				print(f"Privileged task failed: {result.stderr}")
+		except Exception as e:
+			print(f"An error occurred: {e}")
+
+class Debug:
+	def __init__(self,debug_flag):
+		self.debug_flag = debug_flag
+
+	def set_debug(flag):
+		''' turn debugging on and off with boolean '''
+		self.debug_flag = flag
+
+	def __call__(self,*args):
+		''' print *args as debug message with caller '''
+		if self.debug_flag:
+			frames = inspect.stack()
+			grandcaller = frames[3] if len(frames) >= 4 else None
+			gc='~none~'
+			if grandcaller:
+				grandcaller_file = os.path.basename(grandcaller.filename)
+				grandcaller_line = grandcaller.lineno
+				grandcaller_function = grandcaller.function
+				gc=f"{grandcaller_file}:{grandcaller_line} {grandcaller_function}"
+
+			frame = inspect.getouterframes(inspect.currentframe(), 2)[1]
+			caller = frame[3]
+			file = os.path.basename(frame[1])
+			line = frame[2]
+			cs = f'{file}:{line} {caller}'
+
+			caller_text = f'{gc}->{cs}'
+			tag = '\x1b[1;34;40mDEBUG\x1b[0m'
+			print(f'{tag} - \033[1;36;40m{caller_text}\033[0m :\033[1;37;40m',*args, '\033[0m',file=sys.stderr)
+
+
+if __name__ == "__main__":
+	debug = Debug(True)
+	s = ServiceViewer()
+	Gtk.main()
