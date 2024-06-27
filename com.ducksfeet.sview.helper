@@ -16,7 +16,7 @@ try:
 	if result.returncode == 0:
 		pass
 	else:
-		print(f"Privileged task failed: {result.stderr}",sys.stderr)
+		print(f"Privileged task failed: {result.stderr}",file=sys.stderr)
 except Exception as e:
-	print(f"An error occurred: {e}",sys,stderr)
+	print(f"An error occurred: {e}",file=sys.stderr)
 
