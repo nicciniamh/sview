@@ -7,16 +7,16 @@ function abort() {
 }
 modules="gi pystemd"
 policy_path="/usr/share/polkit-1/actions"
-helper_path="/usr/share/polkit-1/helpers"
+rules_path="/usr/share/polkit-1/rules"
 policy="com.ducksfeet.sview.policy"
-helper="com.ducksfeet.sview.helper"
+rules="10-systemctl-polkit.rulesr"
 desktop="sview.desktop"
 binloc="/usr/bin"
 cat << EOF
 This script installs sview - the Linux Systemd Unit Viewer.
 Locations:
 Policy: ${policy_path}/${policy}
-Helper: ${helper_path}/${helper}
+rules: ${rules_path}/${rules}
 Program: ${binloc}
 EOF
 
@@ -30,6 +30,6 @@ for module in $modules ; do
 done
 echo "Modules are ok, installing files"
 install --backup -m 644 ${policy} ${policy_path}/${policy} || abort "Error installing policy"
-install --backup -D -m 755 ${helper} ${helper_path}/${helper} || abort "Error installing helper"
+install --backup -D -m 644 ${rules} ${rules_path}/${rules} || abort "Error installing rules"
 install --backup -m 755 sview ${binloc}/sview || abort "Error installing program"
 xdg-desktop-menu install --novendor ${desktop}

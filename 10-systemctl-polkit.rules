@@ -1,0 +1,8 @@
+polkit.addRule(function(action, subject) {
+    if (action.id == "com.ducksfeet.systemctl.start"   ||
+        action.id == "com.ducksfeet.systemctl.stop"    ||
+        action.id == "com.ducksfeet.systemctl.disable" ||
+        action.id == "com.ducksfeet.systemctl.enable") {
+            return polkit.Result.YES;
+    }
+});

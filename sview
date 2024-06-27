@@ -118,21 +118,21 @@ class ServiceViewer(Gtk.Window):
 
 		if item == 'Running':
 			if state:
-				self.run_privileged_task(unit, 'start')
+				self.run_systemctl_command('start', unit)
 			else:
-				self.run_privileged_task(unit, 'stop')
+				self.run_systemctl_command('stop', unit)
 		elif item == 'Active':
 			if state:
-				self.run_privileged_task(unit, 'enable')
+				self.run_systemctl_command('enable', unit)
 			else:
-				self.run_privileged_task(unit, 'disable')
+				self.run_systemctl_command('disable', unit)
 		else:
 			raise IndexError(f'Invalid item {item}')
 
 
-	def run_privileged_task(self,*args):
+	def run_systemctl_command(self,*args):
 		# Command to run the privileged script with pkexec
-		command = ["pkexec", "/usr/share/polkit-1/helpers/com.ducksfeet.sview.helper",*args]
+		command = ["pkexec", "/bin/systemctl",*args]
 		
 		# Run the command
 		try:
@@ -140,10 +140,25 @@ class ServiceViewer(Gtk.Window):
 			if result.returncode == 0:
 				print("Privileged task completed successfully",result.stdout)
 			else:
-				print(f"Privileged task failed: {result.stderr}")
+				MessageDialog(self,"subprocess Error, systemctl returned non-zero",result.stderr)
 		except Exception as e:
-			print(f"An error occurred: {e}")
+			MessageDialog(self,f"Exception calling systemctl",f"{e}\n{result.stderr}")
 
+class MessageDialog(Gtk.Dialog):
+    def __init__(self, parent, title, *args):
+        super().__init__(title=title, transient_for=parent, flags=0)
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
+        )
+
+        self.set_default_size(150, 100)
+
+        label = Gtk.Label(label=' '.join([*args]))
+
+        box = self.get_content_area()
+        box.add(label)
+        self.show_all()
+        
 class Debug:
 	def __init__(self,debug_flag):
 		self.debug_flag = debug_flag
