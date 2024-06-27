@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import os
 import sys
 import textwrap
@@ -14,16 +13,14 @@ debug_flag = False
 
 def get_units(include_all=True):
 	"""
-	returns a dictionary of unit information, keyed on the unit name. 
+	Returns a dictionary of unit information, keyed on the unit name.
 	"""
 	m = Manager()
 	m.load()
 	units = {}
 	for u in m.ListUnits():
 		ud = {}
-		ud['unit'] = '\n'.join(textwrap.wrap(u[0].decode('utf-8'),40))
-		if not include_all and not 'service' in ud['unit']:
-			continue
+		ud['unit'] = '\n'.join(textwrap.wrap(u[0].decode('utf-8'), 40))
 		ud['description'] = '\n'.join(textwrap.wrap(u[1].decode('utf-8'), 40))
 		ud['loaded'] = (u[2].decode('utf-8').lower() == 'loaded')
 		ud['active'] = (u[3].decode('utf-8').lower() == 'active')
@@ -41,15 +38,18 @@ class ServiceViewer(Gtk.Window):
 		self.grid = None
 		self.set_size_request(1280, 600)
 		self.load_tree_view()
+		self.search_buttons = []
+		self.search_results = []
+		self.search_index = 0
 
-	def get_buttons(self,buttondef):
+	def get_buttons(self, buttondef):
 		"""
-		return a Gtk.ButtonBox populate with the buttons we want
+		Return a Gtk.ButtonBox populated with the buttons we want.
 		"""
-		buttons = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL)
+		self.button_box = buttons = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL)
 		buttons.set_layout(Gtk.ButtonBoxStyle.START)
 
-		for label,action in buttondef:
+		for label, action in buttondef:
 			button = Gtk.Button(label=label)
 			button.connect('clicked', action)
 			buttons.pack_start(button, False, False, 0)
@@ -57,7 +57,7 @@ class ServiceViewer(Gtk.Window):
 
 	def load_tree_view(self, *args):
 		self.units = get_units()
-		buttons = self.get_buttons([('Close',Gtk.main_quit),('Reload Units',self.load_tree_view)])
+		buttons = self.get_buttons([('Close', Gtk.main_quit), ('Reload Units', self.load_tree_view), ('Search Unit', self.on_search_clicked)])
 		if self.grid:
 			self.remove(self.grid)
 		self.grid = Gtk.Grid()
@@ -71,9 +71,9 @@ class ServiceViewer(Gtk.Window):
 			self.store.append(items)
 			items.append(ud['file'])
 			self.storelist.append(items)
-		
+
 		self.tree_view = Gtk.TreeView(model=self.store)
-		
+
 		# Text columns
 		for i, column_title in enumerate(["Unit", "Description"]):
 			renderer = Gtk.CellRendererText()
@@ -82,7 +82,7 @@ class ServiceViewer(Gtk.Window):
 			self.tree_view.append_column(column)
 			# Make columns sortable
 			column.set_sort_column_id(i)
-		
+
 		# Toggle columns
 		for i, column_title in enumerate(["Active", "Running"], start=2):
 			renderer = Gtk.CellRendererToggle()
@@ -94,7 +94,7 @@ class ServiceViewer(Gtk.Window):
 			self.tree_view.append_column(column)
 			# Make columns sortable
 			column.set_sort_column_id(i)
-		
+
 		self.scrolled_window.add(self.tree_view)
 		self.scrolled_window.set_vexpand(True)
 		self.scrolled_window.set_hexpand(True)
@@ -112,7 +112,7 @@ class ServiceViewer(Gtk.Window):
 
 	def set_service_state(self, unit, item, state):
 		"""
-		this is where we call systemd to manipulate units based on item and state
+		This is where we call systemd to manipulate units based on item and state.
 		"""
 		debug(unit, item, state)
 
@@ -129,55 +129,142 @@ class ServiceViewer(Gtk.Window):
 		else:
 			raise IndexError(f'Invalid item {item}')
 
-
-	def run_systemctl_command(self,*args):
+	def run_systemctl_command(self, *args):
 		# Command to run the privileged script with pkexec
-		command = ["pkexec", "/bin/systemctl",*args]
-		
+		command = ["pkexec", "/bin/systemctl", *args]
+
 		# Run the command
 		try:
 			result = subprocess.run(command, capture_output=True, text=True)
 			if result.returncode == 0:
-				print("Privileged task completed successfully",result.stdout)
+				print("Privileged task completed successfully", result.stdout)
 			else:
-				MessageDialog(self,"subprocess Error, systemctl returned non-zero",result.stderr)
+				d = MessageDialog(self, "subprocess Error, systemctl returned non-zero", result.stderr)
+				d.run()
+				d.destroy()
 		except Exception as e:
-			MessageDialog(self,f"Exception calling systemctl",f"{e}\n{result.stderr}")
+			d = MessageDialog(self, f"Exception calling systemctl", f"{e}\n{result.stderr}")
+			d.run()
+			d.destroy()
+
+	def search_and_select(self, search_text):
+		"""
+		Search for the first row that contains the search_text in the first column and select it.
+		"""
+		self.search_results = []
+		self.search_index = 0
+		for row in self.store:
+			if search_text.lower() in row[0].lower():
+				path = self.store.get_path(row.iter)
+				self.search_results.append(path)
+
+		if len(self.search_results):
+			search_index = -1
+			self.open_search()
+			self.search_next()
+			return  True
+		return False
+
+	def open_search(self,*args):
+		self.search_buttons = []
+		for label, action in [('Search Previous',self.search_prev),('Search Next',self.search_next),('Close Search',self.close_search)]:
+			button = Gtk.Button(label=label)
+			button.connect('clicked',action)
+			self.search_buttons.append(button)
+			self.button_box.pack_start(button,True,True,0)
+			self.button_box.show_all()
+
+	def close_search(self,*args):
+		for button in self.search_buttons:
+			self.button_box.remove(button)
+		self.search_buttons = []
+		self.search_results = []
+		self.search_index = 0
+
+	def search_next(self,*args):
+		if not len(self.search_results):
+			return
+		self.search_index += 1
+		if self.search_index >= len(self.search_results):
+			self.search_index = 0
+		path = self.search_results[self.search_index]
+
+		self.tree_view.set_cursor(path)
+		self.tree_view.scroll_to_cell(path)
+
+	def search_prev(self,*args):
+		if not len(self.search_results):
+			return
+		self.search_index -= 1
+		if self.search_index < 0:
+			self.search_index = len(self.search_results) -1
+		path = self.search_results[self.search_index]
+	
+		self.tree_view.set_cursor(path)
+		self.tree_view.scroll_to_cell(path)
+
+
+	def on_search_clicked(self, button):
+		"""
+		Handle search button click, show an input dialog to get search text.
+		"""
+		self.close_search()
+		dialog = Gtk.MessageDialog(parent=self,
+								   modal=True,
+								   destroy_with_parent=True,
+								   message_type=Gtk.MessageType.QUESTION,
+								   buttons=Gtk.ButtonsType.OK_CANCEL,
+								   text="Search Unit")
+		dialog.set_title("Search Unit")
+		entry = Gtk.Entry()
+		entry.set_text("Enter unit name")
+		dialog.vbox.pack_end(entry, True, True, 0)
+		dialog.show_all()
+		response = dialog.run()
+		result = True
+		if response == Gtk.ResponseType.OK:
+			search_text = entry.get_text()
+			result = self.search_and_select(search_text)
+		dialog.destroy()
+		if not result:
+			dialog = MessageDialog(self,'No results',f'The term, "{search_text}" was not found.')
+			dialog.run()
+			dialog.destroy()
 
 class MessageDialog(Gtk.Dialog):
-    def __init__(self, parent, title, *args):
-        super().__init__(title=title, transient_for=parent, flags=0)
-        self.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
-        )
+	def __init__(self, parent, title, *args):
+		super().__init__(title=title, transient_for=parent, flags=0)
+		self.add_buttons(
+			Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
+		)
 
-        self.set_default_size(150, 100)
+		self.set_default_size(150, 100)
 
-        label = Gtk.Label(label=' '.join([*args]))
+		label = Gtk.Label(label=' '.join([*args]))
 
-        box = self.get_content_area()
-        box.add(label)
-        self.show_all()
-        
+		box = self.get_content_area()
+		box.add(label)
+		self.show_all()
+
 class Debug:
-	def __init__(self,debug_flag):
+	def __init__(self, debug_flag):
 		self.debug_flag = debug_flag
 
 	def set_debug(flag):
 		''' turn debugging on and off with boolean '''
 		self.debug_flag = flag
 
-	def __call__(self,*args):
+	def __call__(self, *args):
 		''' print *args as debug message with caller '''
 		if self.debug_flag:
 			frames = inspect.stack()
 			grandcaller = frames[3] if len(frames) >= 4 else None
-			gc='~none~'
+			gc = '~none~'
 			if grandcaller:
 				grandcaller_file = os.path.basename(grandcaller.filename)
 				grandcaller_line = grandcaller.lineno
 				grandcaller_function = grandcaller.function
-				gc=f"{grandcaller_file}:{grandcaller_line} {grandcaller_function}"
+				gc = f"{grandcaller_file}:{grandcaller_line} {grandcaller_function}"
 
 			frame = inspect.getouterframes(inspect.currentframe(), 2)[1]
 			caller = frame[3]
@@ -187,12 +274,11 @@ class Debug:
 
 			caller_text = f'{gc}->{cs}'
 			tag = '\x1b[1;34;40mDEBUG\x1b[0m'
-			print(f'{tag} - \033[1;36;40m{caller_text}\033[0m :\033[1;37;40m',*args, '\033[0m',file=sys.stderr)
-
+			print(f'{tag} - \033[1;36;40m{caller_text}\033[0m :\033[1;37;40m', *args, '\033[0m', file=sys.stderr)
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Systemd Unit Viewer')
-	parser.add_argument('-d','--debug', action='store_true', default=False, help='Enable debug messages')
+	parser.add_argument('-d', '--debug', action='store_true', default=False, help='Enable debug messages')
 	args = parser.parse_args()
 	debug = Debug(args.debug)
 	if args.debug:
