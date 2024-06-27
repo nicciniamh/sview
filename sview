@@ -57,7 +57,7 @@ class ServiceViewer(Gtk.Window):
 
 	def load_tree_view(self, *args):
 		self.units = get_units()
-		buttons = self.get_buttons([('Close', Gtk.main_quit), ('Reload Units', self.load_tree_view), ('Search Unit', self.on_search_clicked)])
+		buttons = self.get_buttons([('Close', Gtk.main_quit), ('Reload Units', self.load_tree_view), ('Search', self.on_search_clicked)])
 		if self.grid:
 			self.remove(self.grid)
 		self.grid = Gtk.Grid()
