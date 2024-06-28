@@ -39,11 +39,11 @@ class ServiceViewer(Gtk.Window):
 		pixbuf = icon_theme.load_icon('text-x-systemd-unit', 64, 0)
 		self.set_icon(pixbuf)
 		self.grid = None
-		self.set_size_request(1280, 600)
-		self.load_tree_view()
 		self.search_buttons = []
 		self.search_results = []
 		self.search_index = 0
+		self.set_size_request(1280, 600)
+		self.load_tree_view()
 
 	def get_buttons(self, buttondef):
 		"""
@@ -103,6 +103,9 @@ class ServiceViewer(Gtk.Window):
 		self.scrolled_window.set_hexpand(True)
 
 		self.add(self.grid)
+		if len(self.search_results):
+			self.open_search()
+
 		self.show_all()
 
 	def on_cell_toggled(self, widget, path, user_data):
@@ -150,6 +153,7 @@ class ServiceViewer(Gtk.Window):
 			d.run()
 			d.destroy()
 
+
 	def search_and_select(self, search_text):
 		"""
 		Search for the first row that contains the search_text in the first column and select it.
@@ -192,8 +196,9 @@ class ServiceViewer(Gtk.Window):
 			self.search_index = 0
 		path = self.search_results[self.search_index]
 
-		self.tree_view.set_cursor(path)
 		self.tree_view.scroll_to_cell(path)
+		self.tree_view.set_cursor(path)
+		
 
 	def search_prev(self,*args):
 		if not len(self.search_results):
@@ -203,8 +208,8 @@ class ServiceViewer(Gtk.Window):
 			self.search_index = len(self.search_results) -1
 		path = self.search_results[self.search_index]
 	
-		self.tree_view.set_cursor(path)
 		self.tree_view.scroll_to_cell(path)
+		self.tree_view.set_cursor(path)
 
 
 	def on_search_clicked(self, button):
@@ -228,6 +233,7 @@ class ServiceViewer(Gtk.Window):
 		if response == Gtk.ResponseType.OK:
 			search_text = entry.get_text()
 			result = self.search_and_select(search_text)
+		debug('Closing dialog')
 		dialog.destroy()
 		if not result:
 			dialog = MessageDialog(self,'No results',f'The term, "{search_text}" was not found.')
