@@ -3,7 +3,7 @@ import sys
 import os
 import importlib
 if len(sys.argv) < 2:
-	print(f'{os.path.basename(argv[0])}: usgage testmod module [..module ..module]',file=sys.stderr)
+	print(f'{os.path.basename(sys.argv[0])}: usgage testmod module [..module ..module]',file=sys.stderr)
 	sys.exit(1)
 for module in sys.argv[1:]:
 	try:
