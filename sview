@@ -238,7 +238,6 @@ class ServiceViewer(Gtk.Window):
 
 class MessageDialog(Gtk.Window):
 	def __init__(self,**kwargs):
-		debug(dict(kwargs))
 		self.button_clicked = None
 		parent = kwargs.get('parent',None)
 		title = kwargs.get('title','dialog')
