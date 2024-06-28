@@ -45,6 +45,10 @@ class ServiceViewer(Gtk.Window):
 		self.set_size_request(1280, 600)
 		self.load_tree_view()
 
+		dialog = MessageDialog(self,"Warning","Changing systemctl unit settings may make your system unstable\nDo so at your own peril!")
+		dialog.run()
+		dialog.destroy()		
+
 	def get_buttons(self, buttondef):
 		"""
 		Return a Gtk.ButtonBox populated with the buttons we want.
@@ -244,7 +248,8 @@ class MessageDialog(Gtk.Dialog):
 	def __init__(self, parent, title, *args):
 		super().__init__(title=title, transient_for=parent, flags=0)
 		self.add_buttons(
-			Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK
+#			Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, 
+			Gtk.STOCK_OK, Gtk.ResponseType.OK
 		)
 
 		self.set_default_size(150, 100)
