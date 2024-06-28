@@ -45,9 +45,7 @@ class ServiceViewer(Gtk.Window):
 		self.set_size_request(1280, 600)
 		self.load_tree_view()
 
-		dialog = MessageDialog(self,"Warning","Changing systemctl unit settings may make your system unstable\nDo so at your own peril!")
-		dialog.run()
-		dialog.destroy()		
+		dialog = MessageDialog(parent=self,title="Warning",message="Changing systemctl unit settings may make your system unstable.\nDo so at your own peril!",icon='dialog-warning')
 
 	def get_buttons(self, buttondef):
 		"""
@@ -149,13 +147,9 @@ class ServiceViewer(Gtk.Window):
 			if result.returncode == 0:
 				print("Privileged task completed successfully", result.stdout)
 			else:
-				d = MessageDialog(self, "subprocess Error, systemctl returned non-zero", result.stderr)
-				d.run()
-				d.destroy()
+				MessageDialog(parent=self, title="subprocess Error, systemctl returned non-zero", message=result.stderr,icon="dialog-error")
 		except Exception as e:
-			d = MessageDialog(self, f"Exception calling systemctl", f"{e}\n{result.stderr}")
-			d.run()
-			d.destroy()
+			MessageDialog(parent=self, title=f"Exception calling systemctl", message=f"{e}\r{result.stderr}", icon="dialog-error")
 
 
 	def search_and_select(self, search_text):
@@ -240,25 +234,43 @@ class ServiceViewer(Gtk.Window):
 		debug('Closing dialog')
 		dialog.destroy()
 		if not result:
-			dialog = MessageDialog(self,'No results',f'The term, "{search_text}" was not found.')
-			dialog.run()
-			dialog.destroy()
+			dialog = MessageDialog(parent=self,title='No results',message=f'The term, "{search_text}" was not found.')
 
-class MessageDialog(Gtk.Dialog):
-	def __init__(self, parent, title, *args):
-		super().__init__(title=title, transient_for=parent, flags=0)
-		self.add_buttons(
-#			Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, 
-			Gtk.STOCK_OK, Gtk.ResponseType.OK
-		)
-
-		self.set_default_size(150, 100)
-
-		label = Gtk.Label(label=' '.join([*args]))
-
-		box = self.get_content_area()
-		box.add(label)
+class MessageDialog(Gtk.Window):
+	def __init__(self,**kwargs):
+		debug(dict(kwargs))
+		self.button_clicked = None
+		parent = kwargs.get('parent',None)
+		title = kwargs.get('title','dialog')
+		message = kwargs.get('message','no message')
+		message = textwrap.wrap(message,40)
+		message  = '\n'.join(message)
+		icon = kwargs.get('icon','dialog-info')
+		buttons = kwargs.get('buttons',['Ok'])
+		self.callback = kwargs.get('callback',None)
+		super().__init__(title=title)
+		if parent:
+			self.set_transient_for(parent)
+		grid = Gtk.Grid()
+		mlabel = Gtk.Label()
+		mlabel.set_text(message)
+		mlabel.set_hexpand(True)
+		mlabel.set_vexpand(True)
+		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
+		grid.attach(icon,0,0,1,1)
+		grid.attach(mlabel,1,0,1,1)
+		for i in range(0,len(buttons)):
+			button = Gtk.Button(label=buttons[i])
+			button.connect('clicked',self.button_handler,buttons[i])
+			grid.attach(button,i,1,1,1)
+		self.add(grid)
 		self.show_all()
+
+	def button_handler(self,widget,button):
+		self.button_clicked = button
+		if self.callback:
+			self.callback(button)
+		self.destroy()
 
 class Debug:
 	def __init__(self, debug_flag):
