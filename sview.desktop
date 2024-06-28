@@ -1,9 +1,9 @@
 [Desktop Entry]
 Name=Systemd Unit Viewer
-Comment=View current systemd unts and states
+Comment=View current systemd unts and states, activate, run, etc.
 TryExec=/usr/bin/sview
 Exec=/usr/bin/sview
-Icon=org.gnome.SystemMonitor
+Icon=text-x-systemd-unit
 Terminal=false
 Type=Application
 StartupNotify=true
