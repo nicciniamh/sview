@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
+"""
+This program presents the user with a treeview of each systemctl 
+unit with checkboxes to change their states. Unit names are searchable
+with partial name matches.
+"""
 import os
 import sys
 import textwrap
 import subprocess
 import inspect
 import argparse
+import re
 from pystemd.systemd1 import Unit, Manager
 import gi
 gi.require_version('Gtk', '3.0')
@@ -13,10 +19,10 @@ from gi.repository import Gtk, GdkPixbuf
 debug_flag = False
 
 def set_css(widget, classname, css_data):
-        '''
+        """
         this function takes an arbitrary widget and applies the classname as it's class
         the css_data is applied to the widget.
-        '''
+        """
         if type(css_data) is str:
                 css_data = bytes(css_data.encode('ascii'))
         if type(css_data) is not bytes:
@@ -27,7 +33,7 @@ def set_css(widget, classname, css_data):
         context.add_class(classname)
         context.add_provider(css_provider,Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-def get_units(include_all=True):
+def get_units(filter=None):
 	"""
 	Returns a dictionary of unit information, keyed on the unit name.
 	"""
@@ -35,6 +41,18 @@ def get_units(include_all=True):
 	m.load()
 	units = {}
 	for u in m.ListUnits():
+		ustr = u[0].decode('utf-8')
+		if filter:
+			if filter.startswith('+'):
+				if not filter[1:].lower() in ustr.lower():
+					continue
+			elif filter.startswith('-'):
+				if filter[1:].lower() in ustr.lower():
+					continue
+			else:
+				if not filter.lower() in ustr.lower():
+					continue
+
 		ud = {}
 		ud['unit'] = '\n'.join(textwrap.wrap(u[0].decode('utf-8'), 40))
 		ud['description'] = '\n'.join(textwrap.wrap(u[1].decode('utf-8'), 40))
@@ -48,6 +66,14 @@ def get_units(include_all=True):
 
 class ServiceViewer(Gtk.Window):
 	def __init__(self):
+		"""
+		ServiceViewer subclasses Gtk.Window. 
+		__init__ calls load_tree_view to load up all the systemctl units.
+		When searches are performed the lists, search_results and 
+		search_buttons are populated. search_buttons are the widgets for
+		search previous, search next and close search. When close search is
+		clicekd all of these are removed from the buttonbox. 
+		"""
 		Gtk.Window.__init__(self, title="Systemd Unit Viewer")
 		self.connect('destroy', Gtk.main_quit)
 		icon_theme = Gtk.IconTheme.get_default()
@@ -58,17 +84,33 @@ class ServiceViewer(Gtk.Window):
 		self.search_results = []
 		self.search_index = 0
 		self.set_size_request(1280, 600)
-		self.load_tree_view()
+		self.filter = None
 
 		set_css(self,'sview','.sview {margin: 10px}')
+		self.load_tree_view()
 
-		MessageDialog(parent=self,title="Warning",icon='dialog-warning',
-		message="""Changing systemctl unit settings may make your system unstable.
-		Do so at your own peril!""")
+		message=["Changing systemctl unit settings may make your system unstable.",
+		   "Do so at your own peril!"]
+
+		MessageDialog(
+			parent=self,
+			title="Warning",
+			icon='dialog-warning',
+			buttons=['Cancel','Continue'],
+			callback=self.on_button_clicked, 
+			message = message)
+		
+
+	def on_button_clicked(self,button):
+		if button == 'Cancel':
+			self.destroy()
+			Gtk.main_quit()
 
 	def get_buttons(self, buttondef):
 		"""
-		Return a Gtk.ButtonBox populated with the buttons we want.
+		Return a Gtk.ButtonBox populated with the elements of buttondef
+		which is a list of tuples of button label and button action 
+		which is called when the button is clicked.
 		"""
 		self.button_box = buttons = Gtk.ButtonBox(orientation=Gtk.Orientation.HORIZONTAL)
 		buttons.set_layout(Gtk.ButtonBoxStyle.START)
@@ -79,11 +121,24 @@ class ServiceViewer(Gtk.Window):
 			buttons.pack_start(button, False, False, 0)
 		return buttons
 
-	def load_tree_view(self, *args):
-		self.units = get_units()
+	def load_tree_view(self,widget=None, filter=None, *args):
+		"""
+		load_tree_view loads up the treeview widget, and a buttonbox
+		the treeview and buttonboxes are recreated when this method 
+		is called which will be done by the 'reload units' button. 
+		the treeview and buttonbox are attached to a Gtk.Grid which
+		is added to the main window. If self.grid is not None,
+		self.grid is removed from self and all the widgets are 
+		recreated.
+		"""
+		if filter:
+			self.filter = filter
+		self.units = get_units(self.filter)
 		buttons = self.get_buttons([
 				('Close', Gtk.main_quit), 
-				('Reload Units', self.load_tree_view), 
+				('Reload', self.load_tree_view),
+				('Filter',self.filter_units),
+				('Reset Filter',self.reset_filter),
 				('Search', self.on_search_clicked)
 			])
 		if self.grid:
@@ -133,7 +188,21 @@ class ServiceViewer(Gtk.Window):
 
 		self.show_all()
 
+	def reset_filter(self,*args):
+		self.filter = None
+		self.load_tree_view()
+
+	def filter_units(self,*args):
+		def do_filter(filter):
+			self.load_tree_view(None,filter)
+		FilterDialog(self, do_filter)
+
 	def on_cell_toggled(self, widget, path, user_data):
+		"""
+		this method is called when one of the checkboxes in the 
+		treeview is clicked. From the element and the row 
+		we determine what commands to issue to systemctyl
+		"""
 		i = int(path)
 		index = Gtk.TreePath.new_from_string(path).get_indices()[0]
 		column, column_title = user_data
@@ -177,7 +246,11 @@ class ServiceViewer(Gtk.Window):
 
 	def search_and_select(self, search_text):
 		"""
-		Search for the first row that contains the search_text in the first column and select it.
+		collect a list of paths that match the search term, populate
+		the search_results and set search_index to 0. This allows for 
+		searching within multile results. 
+		If no search results are found, report it in a dialog and stop
+		otherwise, call open_search to set up the search buttons. 
 		"""
 		self.search_results = []
 		self.search_index = 0
@@ -194,6 +267,9 @@ class ServiceViewer(Gtk.Window):
 		return False
 
 	def open_search(self,*args):
+		"""
+		open_search creates the additional search buttons in the button_box
+		"""
 		self.search_buttons = []
 		for label, action in [('Search Previous',self.search_prev),('Search Next',self.search_next),('Close Search',self.close_search)]:
 			button = Gtk.Button(label=label)
@@ -203,6 +279,10 @@ class ServiceViewer(Gtk.Window):
 			self.button_box.show_all()
 
 	def close_search(self,*args):
+		"""
+		close_search removes the additional search buttons from the button_box
+		resets search_results and search_buttons to an empty list. 
+		"""
 		for button in self.search_buttons:
 			self.button_box.remove(button)
 		self.search_buttons = []
@@ -210,6 +290,9 @@ class ServiceViewer(Gtk.Window):
 		self.search_index = 0
 
 	def search_next(self,*args):
+		"""
+		Increment search index and select the next path in the list
+		"""
 		if not len(self.search_results):
 			return
 		self.search_index += 1
@@ -222,6 +305,9 @@ class ServiceViewer(Gtk.Window):
 		
 
 	def search_prev(self,*args):
+		"""
+		decrement search index and select the previous path in the list
+		"""
 		if not len(self.search_results):
 			return
 		self.search_index -= 1
@@ -260,13 +346,24 @@ class ServiceViewer(Gtk.Window):
 			dialog = MessageDialog(parent=self,title='No results',message=f'The term, "{search_text}" was not found.')
 
 class MessageDialog(Gtk.Window):
+	"""
+	MessageDialog 
+	kwargs: 
+		parent - parent to be modal for, none for not modal
+		title - window title
+		icon - gtk icon name 
+		message - text to display
+		buttons - list of strs to make buttons with
+		callback - callback for when button is clicked, callback is called with str for button
+
+	"""
 	def __init__(self,**kwargs):
 		self.button_clicked = None
 		parent = kwargs.get('parent',None)
 		title = kwargs.get('title','dialog')
 		message = kwargs.get('message','no message')
-		message = textwrap.wrap(message,40)
-		message  = '\n'.join(message)
+		if type(message) is list:
+			message = '\n'.join(message)
 		icon = kwargs.get('icon','dialog-info')
 		buttons = kwargs.get('buttons',['Ok'])
 		self.callback = kwargs.get('callback',None)
@@ -281,11 +378,12 @@ class MessageDialog(Gtk.Window):
 		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px}')
 		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
 		grid.attach(icon,0,0,1,1)
-		grid.attach(mlabel,1,0,1,1)
+		grid.attach(mlabel,1,0,4,1)
 		for i in range(0,len(buttons)):
 			button = Gtk.Button(label=buttons[i])
 			button.connect('clicked',self.button_handler,buttons[i])
 			grid.attach(button,i,1,1,1)
+		grid.attach(Gtk.Label(),i,1,1,1)
 		self.add(grid)
 		self.show_all()
 
@@ -295,7 +393,60 @@ class MessageDialog(Gtk.Window):
 			self.callback(button)
 		self.destroy()
 
+class FilterDialog(Gtk.Window):
+	def __init__(self, parent=None, callback=None):
+		self.callback = callback
+		self.parent= parent
+		super().__init__(title="Filter units")
+		if parent:
+			self.set_transient_for(parent)
+		grid = Gtk.Grid()
+		label = Gtk.Label(label="Filter text")
+		self.entry = Gtk.Entry()
+		self.toggle = Gtk.ToggleButton(label="Include")
+		self.toggle.set_active(True)
+		self.toggle.connect('toggled', self.on_toggle)
+		ok = Gtk.Button(label="Ok")
+		can = Gtk.Button(label="Cancel")
+		ok.connect('clicked',self.on_button_click,'ok')
+		can.connect('clicked',self.on_button_click,'cancel')
+		grid.attach(label,0,0,1,1)
+		grid.attach(self.entry,1,0,3,1)
+		grid.attach(self.toggle,0,1,2,1)
+		grid.attach(ok,0,2,1,1)
+		grid.attach(can,1,2,1,1)
+		self.add(grid)
+		set_css(label,'ll','.ll {padding: 10px;}')
+		set_css(self.entry,'ee','.ee {padding: 10px;}')
+		set_css(self.toggle,'tt','.tt {padding: 10px;}')
+		set_css(self, 'ww','.ww {padding: 10px;}')
+		self.show_all()
+
+	def on_button_click(self, widget, button):
+		if self.toggle.get_active():
+			p='+'
+		else:
+			p = '-'
+		if button == 'ok':
+			text = f"{p}{self.entry.get_text()}"
+			if self.callback:
+				self.callback(text)
+		else:
+			self.callback(None)
+		self.destroy()
+
+	def on_toggle(self,widget):
+		if widget.get_active():
+			widget.set_label('Include')
+		else:
+			widget.set_label('Exclude')
+
 class Debug:
+	"""
+	This class allows for the printing of debug messages. Variable arguments can be 
+	passed to join multiple strings. 
+	Debug messages are printed with some color highlighting and short call history..
+	"""
 	def __init__(self, debug_flag):
 		self.debug_flag = debug_flag
 
