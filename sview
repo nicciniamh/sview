@@ -12,6 +12,21 @@ from gi.repository import Gtk, GdkPixbuf
 
 debug_flag = False
 
+def set_css(widget, classname, css_data):
+        '''
+        this function takes an arbitrary widget and applies the classname as it's class
+        the css_data is applied to the widget.
+        '''
+        if type(css_data) is str:
+                css_data = bytes(css_data.encode('ascii'))
+        if type(css_data) is not bytes:
+                raise TypeError(f'{type(css_data)} is not appropriate for css_data')
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(css_data)
+        context = widget.get_style_context()
+        context.add_class(classname)
+        context.add_provider(css_provider,Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
 def get_units(include_all=True):
 	"""
 	Returns a dictionary of unit information, keyed on the unit name.
@@ -45,7 +60,11 @@ class ServiceViewer(Gtk.Window):
 		self.set_size_request(1280, 600)
 		self.load_tree_view()
 
-		dialog = MessageDialog(parent=self,title="Warning",message="Changing systemctl unit settings may make your system unstable.\nDo so at your own peril!",icon='dialog-warning')
+		set_css(self,'sview','.sview {margin: 10px}')
+
+		MessageDialog(parent=self,title="Warning",icon='dialog-warning',
+		message="""Changing systemctl unit settings may make your system unstable.
+		Do so at your own peril!""")
 
 	def get_buttons(self, buttondef):
 		"""
@@ -62,7 +81,11 @@ class ServiceViewer(Gtk.Window):
 
 	def load_tree_view(self, *args):
 		self.units = get_units()
-		buttons = self.get_buttons([('Close', Gtk.main_quit), ('Reload Units', self.load_tree_view), ('Search', self.on_search_clicked)])
+		buttons = self.get_buttons([
+				('Close', Gtk.main_quit), 
+				('Reload Units', self.load_tree_view), 
+				('Search', self.on_search_clicked)
+			])
 		if self.grid:
 			self.remove(self.grid)
 		self.grid = Gtk.Grid()
@@ -255,6 +278,7 @@ class MessageDialog(Gtk.Window):
 		mlabel.set_text(message)
 		mlabel.set_hexpand(True)
 		mlabel.set_vexpand(True)
+		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px}')
 		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
 		grid.attach(icon,0,0,1,1)
 		grid.attach(mlabel,1,0,1,1)
@@ -276,11 +300,12 @@ class Debug:
 		self.debug_flag = debug_flag
 
 	def set_debug(self,flag):
-		''' turn debugging on and off with boolean '''
 		self.debug_flag = flag
 
 	def __call__(self, *args):
-		''' print *args as debug message with caller '''
+		"""
+		print *args as debug message with caller
+		"""
 		if self.debug_flag:
 			frames = inspect.stack()
 			grandcaller = frames[3] if len(frames) >= 4 else None
