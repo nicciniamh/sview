@@ -275,7 +275,7 @@ class Debug:
 	def __init__(self, debug_flag):
 		self.debug_flag = debug_flag
 
-	def set_debug(flag):
+	def set_debug(self,flag):
 		''' turn debugging on and off with boolean '''
 		self.debug_flag = flag
 
