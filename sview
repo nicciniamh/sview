@@ -369,20 +369,21 @@ class MessageDialog(Gtk.Window):
 		mlabel.set_vexpand(True)
 		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px;}')
 		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
-		title = Gtk.Label(label=title)
-		set_css(title,'title','.title {color: white; background: rgb(20,20,20); font-weight: bold; }')
-		grid.attach(title,0,0,5,1)
-		grid.attach(icon,0,1,1,1)
-		grid.attach(mlabel,1,1,4,1)
+		titlebar = Gtk.HeaderBar()
+		titlebar.set_title(title)
+		grid.attach(titlebar,0,0,5,1)
+		row = 1
+		grid.attach(icon,	0, row,1,1)
+		grid.attach(mlabel,	1, row,4,1)
+		row += 1
 		for i in range(0,len(buttons)):
 			button = Gtk.Button(label=buttons[i])
 			button.connect('clicked',self.button_handler,buttons[i].lower())
-			grid.attach(button,i,2,1,1)
-		grid.attach(Gtk.Label(),i,2,1,1)
+			grid.attach(button,i,row,1,1)
 		self.add(grid)
 		self.grid = grid
 		self.show_all()
-
+		
 	def button_handler(self,widget,button):
 		debug('message_dialog',button,self.callback)
 		self.button_clicked = button
