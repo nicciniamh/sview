@@ -358,7 +358,7 @@ class MessageDialog(Gtk.Window):
 		message = kwargs.get('message','no message')
 		if type(message) is list:
 			message = '\n'.join(message)
-		icon = kwargs.get('icon','dialog-info')
+		icon = kwargs.get('icon','dialog-information')
 		buttons = kwargs.get('buttons',['Ok'])
 		self.callback = kwargs.get('callback',None)
 		super().__init__(title=title)
