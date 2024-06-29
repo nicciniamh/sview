@@ -102,7 +102,7 @@ class ServiceViewer(Gtk.Window):
 		
 
 	def on_button_clicked(self,button):
-		if button == 'Cancel':
+		if button.lower() == 'cancel':
 			self.destroy()
 			Gtk.main_quit()
 
@@ -370,7 +370,7 @@ class MessageDialog(Gtk.Window):
 		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px;}')
 		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
 		title = Gtk.Label(label=title)
-		set_css(title,'title','.title {color: white; background: darkgray; font-weight: bold; }')
+		set_css(title,'title','.title {color: white; background: rgb(20,20,20); font-weight: bold; }')
 		grid.attach(title,0,0,5,1)
 		grid.attach(icon,0,1,1,1)
 		grid.attach(mlabel,1,1,4,1)
@@ -422,6 +422,7 @@ class FilterDialog(QueryDialog):
 		kw = dict(kwargs)
 		kw['prompt'] = 'Filter Text'
 		kw['title'] = 'Filter Units'
+		kw['message'] = 'Filter units by full or partial\nname in or out of list'
 		super().__init__(**kw)
 		self.callback = self.on_button
 		self.iflag = ''
