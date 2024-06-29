@@ -423,22 +423,23 @@ class QueryDialog(Gtk.Window):
 
 class FilterDialog(QueryDialog):
 	def __init__(self, parent=None, callback=None):
-		super().__init__(parent,"Filter text",self.complete)
-		self.callback = callback
+		super().__init__(parent,"Filter text",self.on_complete)
+		self.complete_callback = callback
 		self.toggle = Gtk.ToggleButton(label="Include Units")
 		self.toggle.set_active(True)
 		self.toggle.connect('toggled', self.on_toggle)
 		self.grid.insert_row(1)
 		self.grid.attach(self.toggle,0,1,2,1)
 		self.iflag  = ''
+		self.show_all()
 
-	def complete(self,text):
+	def on_complete(self,text):
 		if text:
 			text = f"{self.iflag}{self.entry.get_text()}"
-			if self.callback:
-				self.callback(text)
+			if self.complete_callback:
+				self.complete_callback(text)
 		else:
-			self.callback(None)
+			self.complete_callback(None)
 
 	def on_toggle(self,widget):
 		if widget.get_active():
