@@ -77,7 +77,10 @@ class ServiceViewer(Gtk.Window):
 		Gtk.Window.__init__(self, title="Systemd Unit Viewer")
 		self.connect('destroy', Gtk.main_quit)
 		icon_theme = Gtk.IconTheme.get_default()
-		pixbuf = icon.theme.load_icon('applications-system', 64, ')
+		try:
+			pixbuf = icon_theme.load_icon('text-x-systemd-unit', 64, 0)
+		except:
+			pixbuf = icon_theme.load_icon('applications-system', 64, 0)
 		self.set_icon(pixbuf)
 		self.grid = None
 		self.search_buttons = []
