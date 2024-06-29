@@ -324,26 +324,12 @@ class ServiceViewer(Gtk.Window):
 		Handle search button click, show an input dialog to get search text.
 		"""
 		self.close_search()
-		dialog = Gtk.MessageDialog(parent=self,
-								   modal=True,
-								   destroy_with_parent=True,
-								   message_type=Gtk.MessageType.QUESTION,
-								   buttons=Gtk.ButtonsType.OK_CANCEL,
-								   text="Search Unit")
-		dialog.set_title("Search Unit")
-		entry = Gtk.Entry()
-		entry.set_text("Enter unit name")
-		dialog.vbox.pack_end(entry, True, True, 0)
-		dialog.show_all()
-		response = dialog.run()
-		result = True
-		if response == Gtk.ResponseType.OK:
-			search_text = entry.get_text()
-			result = self.search_and_select(search_text)
-		debug('Closing dialog')
-		dialog.destroy()
-		if not result:
-			dialog = MessageDialog(parent=self,title='No results',message=f'The term, "{search_text}" was not found.')
+		QueryDialog(self,"Search term",self.search_text_in)
+
+	def search_text_in(self,search_text):
+		if search_text:
+			if not self.search_and_select(search_text):
+				MessageDialog(parent=self,title='No results',message=f'The term, "{search_text}" was not found.')
 
 class MessageDialog(Gtk.Window):
 	"""
@@ -368,6 +354,7 @@ class MessageDialog(Gtk.Window):
 		buttons = kwargs.get('buttons',['Ok'])
 		self.callback = kwargs.get('callback',None)
 		super().__init__(title=title)
+		self.set_decorated(False)
 		if parent:
 			self.set_transient_for(parent)
 		grid = Gtk.Grid()
@@ -375,15 +362,18 @@ class MessageDialog(Gtk.Window):
 		mlabel.set_text(message)
 		mlabel.set_hexpand(True)
 		mlabel.set_vexpand(True)
-		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px}')
+		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px;}')
 		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
-		grid.attach(icon,0,0,1,1)
-		grid.attach(mlabel,1,0,4,1)
+		title = Gtk.Label(label=title)
+		set_css(title,'title','.title {color: white; background: darkgray; font-weight: bold; }')
+		grid.attach(title,0,0,5,1)
+		grid.attach(icon,0,1,1,1)
+		grid.attach(mlabel,1,1,4,1)
 		for i in range(0,len(buttons)):
 			button = Gtk.Button(label=buttons[i])
 			button.connect('clicked',self.button_handler,buttons[i])
-			grid.attach(button,i,1,1,1)
-		grid.attach(Gtk.Label(),i,1,1,1)
+			grid.attach(button,i,2,1,1)
+		grid.attach(Gtk.Label(),i,2,1,1)
 		self.add(grid)
 		self.show_all()
 
@@ -395,15 +385,17 @@ class MessageDialog(Gtk.Window):
 
 class FilterDialog(Gtk.Window):
 	def __init__(self, parent=None, callback=None):
+		css_data = '.fdlabel {margin: 10px;}'
 		self.callback = callback
 		self.parent= parent
 		super().__init__(title="Filter units")
+		self.set_decorated(False)
 		if parent:
 			self.set_transient_for(parent)
 		grid = Gtk.Grid()
 		label = Gtk.Label(label="Filter text")
 		self.entry = Gtk.Entry()
-		self.toggle = Gtk.ToggleButton(label="Include")
+		self.toggle = Gtk.ToggleButton(label="Include Units")
 		self.toggle.set_active(True)
 		self.toggle.connect('toggled', self.on_toggle)
 		ok = Gtk.Button(label="Ok")
@@ -416,18 +408,18 @@ class FilterDialog(Gtk.Window):
 		grid.attach(ok,0,2,1,1)
 		grid.attach(can,1,2,1,1)
 		self.add(grid)
-		set_css(label,'ll','.ll {padding: 10px;}')
-		set_css(self.entry,'ee','.ee {padding: 10px;}')
-		set_css(self.toggle,'tt','.tt {padding: 10px;}')
-		set_css(self, 'ww','.ww {padding: 10px;}')
+		set_css(label,'fdlabel',css_data)
+		set_css(self.entry,'fdlabel',css_data)
+		set_css(self.toggle,'fdlabel',css_data)
+		set_css(self,'fdlabel',css_data)
 		self.show_all()
 
 	def on_button_click(self, widget, button):
-		if self.toggle.get_active():
-			p='+'
-		else:
-			p = '-'
 		if button == 'ok':
+			if self.toggle.get_active():
+				p='+'
+			else:
+				p = '-'
 			text = f"{p}{self.entry.get_text()}"
 			if self.callback:
 				self.callback(text)
@@ -437,9 +429,46 @@ class FilterDialog(Gtk.Window):
 
 	def on_toggle(self,widget):
 		if widget.get_active():
-			widget.set_label('Include')
+			widget.set_label('Include Units')
 		else:
-			widget.set_label('Exclude')
+			widget.set_label('Exclude Units')
+
+class QueryDialog(Gtk.Window):
+	def __init__(self, parent=None, prompt="Enter", callback=None):
+		css_data = '.fdlabel {margin: 10px;}'
+		self.callback = callback
+		self.parent= parent
+		super().__init__()
+		self.set_decorated(False)
+		if parent:
+			self.set_transient_for(parent)
+		grid = Gtk.Grid()
+		label = Gtk.Label(label=prompt)
+		self.entry = Gtk.Entry()
+		ok = Gtk.Button(label="Ok")
+		can = Gtk.Button(label="Cancel")
+		ok.connect('clicked',self.on_button_click,'ok')
+		can.connect('clicked',self.on_button_click,'cancel')
+		grid.attach(label,0,0,1,1)
+		grid.attach(self.entry,1,0,3,1)
+		grid.attach(ok,0,1,1,1)
+		grid.attach(can,1,1,1,1)
+		self.add(grid)
+		set_css(label,'fdlabel',css_data)
+		set_css(self.entry,'fdlabel',css_data)
+		set_css(self,'fdlabel',css_data)
+		self.show_all()
+
+	def on_button_click(self, widget, button):
+		if button == 'ok':
+			text = self.entry.get_text().strip()
+			if self.callback:
+				self.callback(text)
+		else:
+			self.callback(None)
+		self.destroy()
+
+
 
 class Debug:
 	"""
