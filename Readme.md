@@ -5,6 +5,8 @@
 ## Description
 This program loads a list of systemd services and displays them with check boxes for "Active" and "Running". Toggling these checkboxes will trigger systemd commands to enable or disable the unit, or start or stop the unit. To accomplish this a policykit policy is used along with a helper than performs the job that we want to use. 
 
+Units can be filtered so that only matches are shown, or mateches are not shown. Units can be searched with forward and backward searching. 
+
 ## Warning
 
 I know very little about systemd but I'm learning. I have, for many years, wished for a way to control systemd securely and visually. 
