@@ -13,6 +13,23 @@ I know very little about systemd but I'm learning. I have, for many years, wishe
 
 I wrotet this yesterday, while watching TV. This should be considered ALPHA code, and should be treated as such. 
 
+## Using
+Each row in the list contains t he name of the unit, description, active and running states, the latter two represented by check boxes. Clicking the checkboxes triggers a systemctrl command to enable/disbale a unit, or start it. 
+
+On the bottom of the screen are buttons for Close, Reload, Filter, Reset Filter and Search. 
+
+* Close closes the program
+* Reload reloads the services and states
+* Filter allows for entering a search term (see below) to filter in or out matching units depending 
+on wether the include or exclude is selected.
+* Reset filter removes any filtering.
+* Search prompts for a search term which is a full or partial name of a unit. When a successful seach is performed three more buttons are added: search previous, seearch next and close search. Searches and filters are case insensitive. 
+* Search previous selects the previous item in the search. Searches wrap. 
+* Search next selects the next item in the search. 
+* Close search clears the search data and removes the search next, search previous and close search buttons. 
+
+If an open search is active, filtering will close that search but searching filtered items is valid.
+
 ## Installation
 To use sview, the follwing python modules are required: 
 

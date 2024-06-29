@@ -373,7 +373,6 @@ class MessageDialog(Gtk.Window):
 
 	"""
 	def __init__(self,**kwargs):
-		debug(dict(kwargs))
 		self.button_clicked = None
 		parent = kwargs.get('parent',None)
 		title = kwargs.get('title','dialog')
@@ -407,7 +406,6 @@ class MessageDialog(Gtk.Window):
 		self.show_all()
 		
 	def button_handler(self,widget,button):
-		debug('message_dialog',button,self.callback)
 		self.button_clicked = button
 		if self.callback:
 			self.callback(button)
@@ -434,7 +432,6 @@ class QueryDialog(MessageDialog):
 		self.show_all()
 
 	def on_button(self,button):
-		debug('query_dialog',button,self.callback)
 		if button.lower() == 'ok':
 			text = self.entry.get_text().strip()
 			if text:
@@ -472,7 +469,6 @@ class FilterDialog(QueryDialog):
 
 
 	def on_button(self,button):
-		debug('filter_dialog',button,self.callback)
 		if button.lower() == 'ok':
 			text = self.entry.get_text().strip()
 			if text:
