@@ -39,6 +39,7 @@ The script, setup.sh, must be run as root. It will install the program, policy f
 |screenshot.png            | Screenshot of app                              |
 |10-systemctl-polkit.rules | Rules for systemctl in polkit                  |
 |com.ducksfeet.sview.policy| Policy for policykit                           |
+|license.txt               | License for using this software                |
 
 ## Bugs 
 probably a lot. 
