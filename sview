@@ -20,8 +20,8 @@ debug_flag = False
 
 def set_css(widget, classname, css_data):
         """
-        this function takes an arbitrary widget and applies the classname as it's class
-        the css_data is applied to the widget.
+        this function takes an arbitrary widget and applies the classname 
+		as its class the css_data is applied to the widget.
         """
         if type(css_data) is str:
                 css_data = bytes(css_data.encode('ascii'))
@@ -78,9 +78,12 @@ class ServiceViewer(Gtk.Window):
 		self.connect('destroy', Gtk.main_quit)
 		icon_theme = Gtk.IconTheme.get_default()
 		try:
-			pixbuf = icon_theme.load_icon('text-x-systemd-unit', 64, 0)
+			self.app_icon = 'text-x-systemd-unit'
+			pixbuf = icon_theme.load_icon(self.app_icon, 64, 0)
 		except:
-			pixbuf = icon_theme.load_icon('applications-system', 64, 0)
+			self.app_icon = 'applications-system'
+			pixbuf = icon_theme.load_icon(self.app_icon, 64, 0)
+		debug('app_icon',self.app_icon)
 		self.set_icon(pixbuf)
 		self.grid = None
 		self.search_buttons = []
@@ -92,7 +95,8 @@ class ServiceViewer(Gtk.Window):
 		set_css(self,'sview','.sview {margin: 10px}')
 		self.load_tree_view()
 
-		message=["Changing systemctl unit settings may make your system unstable.",
+		message=["Changing systemctl unit settings may make your system",
+		   "unstable or unusable","",
 		   "Do so at your own peril!"]
 
 		MessageDialog(
@@ -101,6 +105,7 @@ class ServiceViewer(Gtk.Window):
 			icon='dialog-warning',
 			buttons=['Cancel','Continue'],
 			callback=self.on_button_clicked, 
+			app_icon=self.app_icon,
 			message = message)
 		
 
@@ -198,7 +203,7 @@ class ServiceViewer(Gtk.Window):
 	def filter_units(self,*args):
 		def do_filter(filter):
 			self.load_tree_view(None,filter)
-		FilterDialog(parent=self,callback=do_filter)
+		FilterDialog(parent=self,callback=do_filter,app_icon=self.app_icon)
 
 	def on_cell_toggled(self, widget, path, user_data):
 		"""
@@ -242,9 +247,9 @@ class ServiceViewer(Gtk.Window):
 			if result.returncode == 0:
 				print("Privileged task completed successfully", result.stdout)
 			else:
-				MessageDialog(parent=self, title="subprocess Error, systemctl returned non-zero", message=result.stderr,icon="dialog-error")
+				MessageDialog(parent=self, title="subprocess Error, systemctl returned non-zero", message=result.stderr,icon="dialog-error",app_icon=self.app_icon)
 		except Exception as e:
-			MessageDialog(parent=self, title=f"Exception calling systemctl", message=f"{e}\r{result.stderr}", icon="dialog-error")
+			MessageDialog(parent=self, title=f"Exception calling systemctl", message=f"{e}\r{result.stderr}", icon="dialog-error",app_icon=self.app_icon)
 
 
 	def search_and_select(self, search_text):
@@ -332,12 +337,13 @@ class ServiceViewer(Gtk.Window):
 			message="Enter a full or parital unit name",
 			parent=self,
 			prompt="Search term",
+			app_icon=self.app_icon,
 			callback=self.search_text_in)
 
 	def search_text_in(self,search_text):
 		if search_text:
 			if not self.search_and_select(search_text):
-				MessageDialog(parent=self,title='No results',message=f'The term, "{search_text}" was not found.')
+				MessageDialog(parent=self,title='No results',message=f'The term, "{search_text}" was not found.',app_icon=self.app_icon)
 
 class MessageDialog(Gtk.Window):
 	"""
@@ -354,6 +360,7 @@ class MessageDialog(Gtk.Window):
 	def __init__(self,**kwargs):
 		self.button_clicked = None
 		parent = kwargs.get('parent',None)
+		title_icon = kwargs.get('app_icon',None)
 		title = kwargs.get('title','dialog')
 		message = kwargs.get('message','no message')
 		if type(message) is list:
@@ -372,6 +379,10 @@ class MessageDialog(Gtk.Window):
 		set_css(mlabel,'mlabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px;}')
 		icon = Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.DIALOG)
 		titlebar = Gtk.HeaderBar()
+		if title_icon:
+			icon_theme = Gtk.IconTheme.get_default()
+			pixbuf = icon_theme.load_icon(title_icon, 64, 0)
+			titlebar.pack_start(Gtk.Image.new_from_pixbuf(pixbuf))
 		titlebar.set_title(title)
 		self.set_titlebar(titlebar)
 		row = 0
@@ -537,5 +548,5 @@ if __name__ == "__main__":
 	debug = Debug(args.debug)
 	if args.debug:
 		debug("Debug messages enabled")
-	s = ServiceViewer()
+	sview = ServiceViewer()
 	Gtk.main()
