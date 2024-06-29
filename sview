@@ -383,56 +383,6 @@ class MessageDialog(Gtk.Window):
 			self.callback(button)
 		self.destroy()
 
-class FilterDialog(Gtk.Window):
-	def __init__(self, parent=None, callback=None):
-		css_data = '.fdlabel {margin: 10px;}'
-		self.callback = callback
-		self.parent= parent
-		super().__init__(title="Filter units")
-		self.set_decorated(False)
-		if parent:
-			self.set_transient_for(parent)
-		grid = Gtk.Grid()
-		label = Gtk.Label(label="Filter text")
-		self.entry = Gtk.Entry()
-		self.toggle = Gtk.ToggleButton(label="Include Units")
-		self.toggle.set_active(True)
-		self.toggle.connect('toggled', self.on_toggle)
-		ok = Gtk.Button(label="Ok")
-		can = Gtk.Button(label="Cancel")
-		ok.connect('clicked',self.on_button_click,'ok')
-		can.connect('clicked',self.on_button_click,'cancel')
-		grid.attach(label,0,0,1,1)
-		grid.attach(self.entry,1,0,3,1)
-		grid.attach(self.toggle,0,1,2,1)
-		grid.attach(ok,0,2,1,1)
-		grid.attach(can,1,2,1,1)
-		self.add(grid)
-		set_css(label,'fdlabel',css_data)
-		set_css(self.entry,'fdlabel',css_data)
-		set_css(self.toggle,'fdlabel',css_data)
-		set_css(self,'fdlabel',css_data)
-		self.show_all()
-
-	def on_button_click(self, widget, button):
-		if button == 'ok':
-			if self.toggle.get_active():
-				p='+'
-			else:
-				p = '-'
-			text = f"{p}{self.entry.get_text()}"
-			if self.callback:
-				self.callback(text)
-		else:
-			self.callback(None)
-		self.destroy()
-
-	def on_toggle(self,widget):
-		if widget.get_active():
-			widget.set_label('Include Units')
-		else:
-			widget.set_label('Exclude Units')
-
 class QueryDialog(Gtk.Window):
 	def __init__(self, parent=None, prompt="Enter", callback=None):
 		css_data = '.fdlabel {margin: 10px;}'
@@ -454,6 +404,9 @@ class QueryDialog(Gtk.Window):
 		grid.attach(ok,0,1,1,1)
 		grid.attach(can,1,1,1,1)
 		self.add(grid)
+		self.grid = grid
+		self.ok = ok
+		self.can = can
 		set_css(label,'fdlabel',css_data)
 		set_css(self.entry,'fdlabel',css_data)
 		set_css(self,'fdlabel',css_data)
@@ -468,7 +421,32 @@ class QueryDialog(Gtk.Window):
 			self.callback(None)
 		self.destroy()
 
+class FilterDialog(QueryDialog):
+	def __init__(self, parent=None, callback=None):
+		super().__init__(parent,"Filter text",self.complete)
+		self.callback = callback
+		self.toggle = Gtk.ToggleButton(label="Include Units")
+		self.toggle.set_active(True)
+		self.toggle.connect('toggled', self.on_toggle)
+		self.grid.insert_row(1)
+		self.grid.attach(self.toggle,0,1,2,1)
+		self.iflag  = ''
 
+	def complete(self,text):
+		if text:
+			text = f"{self.iflag}{self.entry.get_text()}"
+			if self.callback:
+				self.callback(text)
+		else:
+			self.callback(None)
+
+	def on_toggle(self,widget):
+		if widget.get_active():
+			self.iflag = '+'
+			widget.set_label('Include Units')
+		else:
+			self.iflag = '-'
+			widget.set_label('Exclude Units')
 
 class Debug:
 	"""
