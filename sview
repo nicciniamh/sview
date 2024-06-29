@@ -195,7 +195,7 @@ class ServiceViewer(Gtk.Window):
 	def filter_units(self,*args):
 		def do_filter(filter):
 			self.load_tree_view(None,filter)
-		FilterDialog(self, do_filter)
+		FilterDialog(parent=self,callback=do_filter)
 
 	def on_cell_toggled(self, widget, path, user_data):
 		"""
@@ -324,7 +324,12 @@ class ServiceViewer(Gtk.Window):
 		Handle search button click, show an input dialog to get search text.
 		"""
 		self.close_search()
-		QueryDialog(self,"Search term",self.search_text_in)
+		QueryDialog(
+			title="Search for units",
+			message="Enter a full or parital unit name",
+			parent=self,
+			prompt="Search term",
+			callback=self.search_text_in)
 
 	def search_text_in(self,search_text):
 		if search_text:
@@ -371,75 +376,60 @@ class MessageDialog(Gtk.Window):
 		grid.attach(mlabel,1,1,4,1)
 		for i in range(0,len(buttons)):
 			button = Gtk.Button(label=buttons[i])
-			button.connect('clicked',self.button_handler,buttons[i])
+			button.connect('clicked',self.button_handler,buttons[i].lower())
 			grid.attach(button,i,2,1,1)
 		grid.attach(Gtk.Label(),i,2,1,1)
 		self.add(grid)
+		self.grid = grid
 		self.show_all()
 
 	def button_handler(self,widget,button):
+		debug('message_dialog',button,self.callback)
 		self.button_clicked = button
 		if self.callback:
 			self.callback(button)
 		self.destroy()
 
-class QueryDialog(Gtk.Window):
-	def __init__(self, parent=None, prompt="Enter", callback=None):
-		css_data = '.fdlabel {margin: 10px;}'
-		self.callback = callback
-		self.parent= parent
-		super().__init__()
-		self.set_decorated(False)
-		if parent:
-			self.set_transient_for(parent)
-		grid = Gtk.Grid()
-		label = Gtk.Label(label=prompt)
+class QueryDialog(MessageDialog):
+	def __init__(self, **kwargs):
+		prompt = kwargs.get('prompt','Entry')
+		self.complete_callback = kwargs.get('callback')
+		title = kwargs.get('title','Query')
+		kw = dict(kwargs)
+		kw['title'] = title
+		kw['icon'] = 'dialog-question'
+		kw['callback'] = self.on_button
+		kw['buttons'] = ['Ok','Cancel']
+		super().__init__(**kw)
+		self.grid.insert_row(2)
+		elabel = Gtk.Label(label=prompt)
+		set_css(elabel,'elabel','.mlabel {font-weight: bold; margin: 10px; padding: 10px;}')
+		self.grid.attach(elabel,0,2,1,1)
 		self.entry = Gtk.Entry()
-		ok = Gtk.Button(label="Ok")
-		can = Gtk.Button(label="Cancel")
-		ok.connect('clicked',self.on_button_click,'ok')
-		can.connect('clicked',self.on_button_click,'cancel')
-		grid.attach(label,0,0,1,1)
-		grid.attach(self.entry,1,0,3,1)
-		grid.attach(ok,0,1,1,1)
-		grid.attach(can,1,1,1,1)
-		self.add(grid)
-		self.grid = grid
-		self.ok = ok
-		self.can = can
-		set_css(label,'fdlabel',css_data)
-		set_css(self.entry,'fdlabel',css_data)
-		set_css(self,'fdlabel',css_data)
+		self.grid.attach(self.entry,1,2,1,1)
 		self.show_all()
 
-	def on_button_click(self, widget, button):
-		if button == 'ok':
-			text = self.entry.get_text().strip()
-			if self.callback:
-				self.callback(text)
-		else:
-			self.callback(None)
-		self.destroy()
+	def on_button(self,button):
+		debug('query_dialog',button,self.callback)
+		if button.lower() == 'ok':
+			if self.complete_callback:
+				self.complete_callback(self.entry.get_text().strip())
+
 
 class FilterDialog(QueryDialog):
-	def __init__(self, parent=None, callback=None):
-		super().__init__(parent,"Filter text",self.on_complete)
-		self.complete_callback = callback
-		self.toggle = Gtk.ToggleButton(label="Include Units")
-		self.toggle.set_active(True)
-		self.toggle.connect('toggled', self.on_toggle)
-		self.grid.insert_row(1)
-		self.grid.attach(self.toggle,0,1,2,1)
-		self.iflag  = ''
+	def __init__(self,**kwargs):
+		self.complete_callback = kwargs.get('callback',None)
+		kw = dict(kwargs)
+		kw['prompt'] = 'Filter Text'
+		kw['title'] = 'Filter Units'
+		super().__init__(**kw)
+		self.callback = self.on_button
+		self.iflag = ''
+		toggle = Gtk.ToggleButton(label='Include Units')
+		toggle.connect('toggled',self.on_toggle)
+		self.grid.insert_row(3)
+		self.grid.attach(toggle,1,3,1,1)
 		self.show_all()
-
-	def on_complete(self,text):
-		if text:
-			text = f"{self.iflag}{self.entry.get_text()}"
-			if self.complete_callback:
-				self.complete_callback(text)
-		else:
-			self.complete_callback(None)
 
 	def on_toggle(self,widget):
 		if widget.get_active():
@@ -448,6 +438,14 @@ class FilterDialog(QueryDialog):
 		else:
 			self.iflag = '-'
 			widget.set_label('Exclude Units')
+
+
+	def on_button(self,button):
+		debug('filter_dialog',button,self.callback)
+		if button.lower() == 'ok':
+			if self.complete_callback:
+				text = self.entry.get_text().strip()
+				self.complete_callback(f"{self.iflag}{text}")
 
 class Debug:
 	"""
