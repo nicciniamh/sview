@@ -84,6 +84,10 @@ class ServiceViewer(Gtk.Window):
 			self.app_icon = 'applications-system'
 			pixbuf = icon_theme.load_icon(self.app_icon, 64, 0)
 		debug('app_icon',self.app_icon)
+		titlebar = Gtk.HeaderBar()
+		titlebar.pack_start(Gtk.Image.new_from_pixbuf(pixbuf))
+		titlebar.set_title("Systemd Unit Viewer")
+		self.set_titlebar(titlebar)
 		self.set_icon(pixbuf)
 		self.grid = None
 		self.search_buttons = []
@@ -157,6 +161,7 @@ class ServiceViewer(Gtk.Window):
 		self.grid.attach(self.scrolled_window, 0, 0, 1, 1)
 		self.grid.attach(buttons, 0, 1, 1, 1)
 		self.store = Gtk.ListStore(str, str, bool, bool)
+
 		for unit, ud in self.units.items():
 			items = [unit, ud['description'], ud['active'], ud['running']]
 			self.store.append(items)
